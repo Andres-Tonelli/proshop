@@ -3,7 +3,10 @@ const mysql = require('mysql2/promise');
 require('dotenv').config();
 
 function convertirFecha(excelDate) {
-    if (!excelDate) return null;
+    if (!excelDate) {
+        console.error("❌ Error: No se encontró la fecha en B1.");
+        process.exit(1);
+    } 
 
     if (typeof excelDate === 'number') {
         const fecha = XLSX.SSF.parse_date_code(excelDate);
@@ -53,7 +56,7 @@ async function importarExcel(filePath) {
 
             // Insertar en la tabla "ordenes"
             const [ordenResult] = await connection.query(
-                "INSERT INTO venta (fechaCierre, apodoVendedor, subtotalArticulos, recibidoNeto) VALUES (?, ?, ?, ?)",
+                "INSERT INTO orden (fechaCierre, apodoVendedor, subtotalArticulos, recibidoNeto) VALUES (?, ?, ?, ?)",
                 valores
             );
 
@@ -65,7 +68,7 @@ async function importarExcel(filePath) {
             for (const producto of productos) {
                 if (producto) {
                     await connection.query(
-                        "INSERT INTO productoxventa (idventa, sku) VALUES (?, ?)",
+                        "INSERT INTO productoxorden (idventa, sku) VALUES (?, ?)",
                         [ordenId, producto]
                     );
                 }
@@ -76,6 +79,7 @@ async function importarExcel(filePath) {
         await connection.end();
     } catch (error) {
         console.error("Error:", error.message);
+        process.exit(1);
     }
 }
 

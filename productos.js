@@ -46,7 +46,7 @@ async function importarNuevoExcel(filePath) {
         const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1 }).slice(3);
 
         // Columnas a extraer: A, C, D, K, P
-        const columnasDeseadas = ["A", "D", "E", "F", "K", "P"];
+        const columnasDeseadas = ["A", "C","D", "E", "F", "K", "P"];
         const indices = columnasDeseadas.map(col => XLSX.utils.decode_col(col));
 
         // Insertar datos en MySQL
@@ -54,7 +54,7 @@ async function importarNuevoExcel(filePath) {
             const valores = indices.map(i => fila[i] ?? null);
 
             await connection.query(
-                "INSERT INTO producto (sku, skuVariante, vendidos, stock, stockDisponible, precioPromedio, fecha) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                "INSERT INTO venta (sku, nombre,skuVariante, stock, stockDisponible, vendidos,precioPromedio, fecha) VALUES (?, ?, ?, ?, ?, ?, ?)",
                 [...valores, fechaB1]
             );
         }
