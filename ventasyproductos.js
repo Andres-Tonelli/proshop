@@ -97,8 +97,8 @@ async function importarNuevoExcel(filePath) {
             }
         }
 
-        console.log("Datos insertados correctamente al ",fechaB1);
-        mensaje = "Datos insertados correctamente al " + String(fechaB1);
+        console.log("Productos y Ventas insertados correctamente al ",fechaB1);
+        mensaje = "Productos y Ventas insertados correctamente al " + String(fechaB1);
       await connection.end();
   } catch (error) {
       console.log("Error: "+ error.message);

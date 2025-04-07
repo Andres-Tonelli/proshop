@@ -82,8 +82,8 @@ async function importarExcel(filePath) {
             fecha = valores[0];
         }
 
-          console.log("Datos insertados correctamente al ",fecha);
-          mensaje = "Datos insertados correctamente al " + String(fecha);
+          console.log("Ordenes insertadas correctamente al ",fecha);
+          mensaje = "Ordenes insertadas correctamente al " + String(fecha);
         await connection.end();
     } catch (error) {
         console.log("Error: "+ error.message);
