@@ -1,5 +1,6 @@
 const XLSX = require('xlsx');
 const mysql = require('mysql2/promise');
+const { exec } = require('child_process');
 require('dotenv').config();
 
 function convertirFecha(fecha) {
@@ -45,8 +46,8 @@ async function importarNuevoExcel(filePath) {
         // Convertir la hoja a JSON y omitir la primera fila si es cabecera
         const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1 }).slice(3);
 
-        // Columnas a extraer: A, C, D, K, P
-        const columnasDeseadas = ["A", "C","D", "E", "F", "K", "P"];
+        // Columnas a extraer: bdcfg
+        const columnasDeseadas = ["B","D","C", "F", "G"];
         const indices = columnasDeseadas.map(col => XLSX.utils.decode_col(col));
 
         // Insertar datos en MySQL
@@ -54,16 +55,29 @@ async function importarNuevoExcel(filePath) {
             const valores = indices.map(i => fila[i] ?? null);
 
             await connection.query(
-                "INSERT INTO venta (sku, nombre,skuVariante, stock, stockDisponible, vendidos,precioPromedio, fecha) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                [...valores, fechaB1]
+                "INSERT INTO producto (sku, nombre, skuVariante, imagen, activo) VALUES (?, ?, ?, ?, ?)",
+                [...valores]
             );
         }
 
-        console.log("Datos insertados correctamente.");
+          console.log("Datos insertados correctamente al ",fechaB1);
+          mensaje = "Datos insertados correctamente al " + String(fechaB1);
         await connection.end();
     } catch (error) {
-        console.error("Error:", error.message);
+        console.log("Error: "+ error.message);
+        mensaje = error.message;
+        process.exit(1);
     }
+
+    exec(`node ./enviarmensaje.js "${mensaje}"`, (error, stdout, stderr) => {
+        if (error) {
+          console.error(`Error al ejecutar script Twilio: ${error.message}`);
+          return;
+        }
+        console.log(`Salida de Twilio:\n${stdout}`);
+      });
+
+    
 }
 
 // Obtener archivo desde argumentos del script

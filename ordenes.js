@@ -1,10 +1,13 @@
 const XLSX = require('xlsx');
 const mysql = require('mysql2/promise');
 require('dotenv').config();
+const { exec } = require('child_process');
+
+var mensaje;
 
 function convertirFecha(excelDate) {
     if (!excelDate) {
-        console.error("❌ Error: No se encontró la fecha en B1.");
+        mensaje = "❌ Error: No se encontró la fecha en B1.";
         process.exit(1);
     } 
 
@@ -24,6 +27,7 @@ function convertirFecha(excelDate) {
 }
 
 async function importarExcel(filePath) {
+
     try {
         // Conectar a MySQL
         const connection = await mysql.createConnection({
@@ -32,8 +36,8 @@ async function importarExcel(filePath) {
             password: process.env.DB_PASSWORD,
             database: process.env.DB_NAME
         });
-
-        console.log("Conectado a la base de datos MySQL.");
+      
+        //console.log("Conectado a la base de datos MySQL.");
 
         // Leer el archivo Excel
         const workbook = XLSX.readFile(filePath);
@@ -46,6 +50,8 @@ async function importarExcel(filePath) {
         // Columnas deseadas y sus índices
         const columnasDeseadas = ["F", "I", "AQ", "AU", "AO"];
         const indices = columnasDeseadas.map(col => XLSX.utils.decode_col(col));
+        
+        var fecha;
 
         // Preparar datos para insertar en MySQL
         for (const fila of jsonData) {
@@ -68,19 +74,31 @@ async function importarExcel(filePath) {
             for (const producto of productos) {
                 if (producto) {
                     await connection.query(
-                        "INSERT INTO productoxorden (idventa, sku) VALUES (?, ?)",
+                        "INSERT INTO productoxorden (idorden, sku) VALUES (?, ?)",
                         [ordenId, producto]
                     );
                 }
             }
+            fecha = valores[0];
         }
 
-        console.log("Datos insertados correctamente.");
+          console.log("Datos insertados correctamente al ",fecha);
+          mensaje = "Datos insertados correctamente al " + String(fecha);
         await connection.end();
     } catch (error) {
-        console.error("Error:", error.message);
+        console.log("Error: "+ error.message);
+        mensaje = error.message;
         process.exit(1);
     }
+
+    exec(`node ./enviarmensaje.js "${mensaje}"`, (error, stdout, stderr) => {
+        if (error) {
+          console.error(`Error al ejecutar script Twilio: ${error.message}`);
+          return;
+        }
+        console.log(`Salida de Twilio:\n${stdout}`);
+      });
+
 }
 
 // Obtener el archivo de los argumentos del script

@@ -1,6 +1,7 @@
 const XLSX = require('xlsx');
 const mysql = require('mysql2/promise');
 const { exit } = require('process');
+const { exec } = require('child_process');
 require('dotenv').config();
 
 function convertirFecha(fecha) {
@@ -27,6 +28,7 @@ function convertirFecha(fecha) {
 }
 
 async function importarNuevoExcel(filePath) {
+    let mensaje;
     try {
         // Conectar a MySQL
         const connection = await mysql.createConnection({
@@ -58,46 +60,59 @@ async function importarNuevoExcel(filePath) {
             let valores = indices.map(i => fila[i] ?? null);
 
             if (valores[2] == null){
-                valores[2] = ""
+                valores[2] = " "
             }
 
-            const [sku, nombre, skuVariante, ,stockDisponible, ,] = valores; // Mapeo de valores
+            const [sku, nombre, skuVariante, stock, stockDisponible, ,] = valores; // Mapeo de valores
 
-
+  
             // Insertar en "venta"
             await connection.query(
                 "INSERT INTO venta (sku, nombre, skuVariante, stock, stockDisponible, vendidos, precioPromedio, fecha) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                 [...valores, fechaB1]
             );
-
             // Verificar si el SKU ya existe en "producto"
-            const [productoExistente, UltimaModificacion] = await connection.query(
+            let [productoExistente, UltimaModificacion] = await connection.query(
                 "SELECT sku, fechaUltimaModificacion FROM producto WHERE sku like ? AND skuVariante like ?",
                 [sku, skuVariante]
             );
+
+            if (UltimaModificacion == null){
+                UltimaModificacion = '1990-01-01'
+            }
 
             if (productoExistente.length > 0 && UltimaModificacion > fechaB1) {
 
                 // Actualizar stock y fechaUltimaModificacion
                 await connection.query(
-                    "UPDATE producto SET stock = ?, fechaUltimaModificacion = ? WHERE sku like ? AND skuVariante like ?",
-                    [stockDisponible, fechaB1, sku, skuVariante]
+                    "UPDATE producto SET stock = ?, stockDisponible = ?, fechaUltimaModificacion = ?, activo = ? WHERE sku like ? AND skuVariante like ?",
+                    [stock, stockDisponible, fechaB1, 1, sku, skuVariante]
                 );
-
             } else {
                 // Insertar nuevo producto
                 await connection.query(
-                    "INSERT INTO producto (sku, nombre, skuVariante, stock, activo, fechaUltimaModificacion) VALUES (?, ?, ?, ?, ?, ?)",
-                    [sku, nombre, skuVariante, stockDisponible, 1, fechaB1]
+                    "INSERT INTO producto (sku, nombre, skuVariante, stock, stockDisponible, activo, fechaUltimaModificacion) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                    [sku, nombre, skuVariante, stock, stockDisponible, 1, fechaB1]
                 );
             }
         }
-        console.log("Datos insertados/actualizados correctamente.");
-        await connection.end();
-    } catch (error) {
-        console.error("Error:", error.message);
-        process.exit(1);
-    }
+
+        console.log("Datos insertados correctamente al ",fechaB1);
+        mensaje = "Datos insertados correctamente al " + String(fechaB1);
+      await connection.end();
+  } catch (error) {
+      console.log("Error: "+ error.message);
+      mensaje = error.message;
+      process.exit(1);
+  }
+
+  exec(`node ./enviarmensaje.js "${mensaje}"`, (error, stdout, stderr) => {
+      if (error) {
+        console.error(`Error al ejecutar script Twilio: ${error.message}`);
+        return;
+      }
+      console.log(`Salida de Twilio:\n${stdout}`);
+    });
 }
 
 // Obtener archivo desde argumentos del script
