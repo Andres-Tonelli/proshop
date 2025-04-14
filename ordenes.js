@@ -37,7 +37,6 @@ async function importarExcel(filePath) {
             database: process.env.DB_NAME
         });
       
-        //console.log("Conectado a la base de datos MySQL.");
 
         // Leer el archivo Excel
         const workbook = XLSX.readFile(filePath);
@@ -90,6 +89,20 @@ async function importarExcel(filePath) {
         mensaje = error.message;
         process.exit(1);
     }
+
+    exec(`node ./calculodiarioordenes.js ${fecha}`, (error, stdout, stderr) => {
+        if (error) {
+            console.error(`❌ Error al ejecutar el script: ${error.message}`);
+            return;
+        }
+    
+        if (stderr) {
+            console.error(`⚠️ STDERR: ${stderr}`);
+            return;
+        }
+    
+        console.log(`📤 Resultado del script:\n${stdout}`);
+    });
 
     exec(`node ./enviarmensaje.js "${mensaje}"`, (error, stdout, stderr) => {
         if (error) {

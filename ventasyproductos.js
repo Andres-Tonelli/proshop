@@ -106,6 +106,20 @@ async function importarNuevoExcel(filePath) {
       process.exit(1);
   }
 
+  exec(`node ./calculodiarioventas.js ${fechaB1}`, (error, stdout, stderr) => {
+    if (error) {
+        console.error(`❌ Error al ejecutar el script: ${error.message}`);
+        return;
+    }
+
+    if (stderr) {
+        console.error(`⚠️ STDERR: ${stderr}`);
+        return;
+    }
+
+    console.log(`📤 Resultado del script:\n${stdout}`);
+});
+
   exec(`node ./enviarmensaje.js "${mensaje}"`, (error, stdout, stderr) => {
       if (error) {
         console.error(`Error al ejecutar script Twilio: ${error.message}`);
