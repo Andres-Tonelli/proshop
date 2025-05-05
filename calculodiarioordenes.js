@@ -1,5 +1,6 @@
-require('dotenv').config();
+const dayjs = require('dayjs');
 const mysql = require('mysql2/promise');
+require('dotenv').config();
 
 const fecha = process.argv[2];
 
@@ -8,8 +9,10 @@ if (!fecha || !/^\d{4}-\d{2}-\d{2}$/.test(fecha)) {
     process.exit(1);
 }
 
-async function sumarRecibido(fecha) {
+async function sumarRecibido(fechaStr) {
     let connection;
+    const fechaActual = dayjs(fechaStr);
+    const fechaAnterior = fechaActual.subtract(7, 'day').format('YYYY-MM-DD');
 
     try {
         connection = await mysql.createConnection({
@@ -19,26 +22,32 @@ async function sumarRecibido(fecha) {
             database: process.env.DB_NAME
         });
 
+        // Total del día actual
         const [rows] = await connection.execute(
             'SELECT SUM(recibidoNeto) AS total FROM orden WHERE fechaCierre = ?',
-            [fecha]
+            [fechaStr]
         );
-
         const total = rows[0].total ?? 0;
-        console.log(`✅ Total recibidoNeto para el ${fecha}: $${total}`);
 
-        // Insertar o actualizar en totalordenesdia
-        await connection.execute(
-            `INSERT INTO totalordenesdia (tordenes_fecha, tordenes_total)
-             VALUES (?, ?)
-             ON DUPLICATE KEY UPDATE tordenes_total = VALUES(tordenes_total)`,
-            [fecha, total]
+        // Total del mismo día hace 7 días
+        const [rowsPrev] = await connection.execute(
+            'SELECT SUM(recibidoNeto) AS total FROM orden WHERE fechaCierre = ?',
+            [fechaAnterior]
         );
+        const totalAnterior = rowsPrev[0].total ?? 0;
 
-        console.log(`✅ Total insertado/actualizado en la tabla totalordenesdia`);
+        // Insertar o actualizar el total del día actual
+        await connection.execute(
+            `INSERT INTO totalordenesdia (tordenes_fecha, tordenes_total, tordenes_total7dias)
+             VALUES (?, ?, ?)
+             `,/*ON DUPLICATE KEY UPDATE 
+             tordenes_total = VALUES(tordenes_total),
+             tordenes_total7dias = VALUES(tordenes_total7dias)*/
+            [fechaStr, total, totalAnterior]
+        );
+        console.log(`✅ Total insertado/actualizado para ${fechaStr}`);
 
         await connection.end();
-
     } catch (error) {
         console.error("❌ Error:", error.message);
         if (connection) await connection.end();

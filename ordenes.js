@@ -8,7 +8,7 @@ var mensaje;
 function convertirFecha(excelDate) {
     if (!excelDate) {
         mensaje = "❌ Error: No se encontró la fecha en B1.";
-        process.exit(1);
+        return
     } 
 
     if (typeof excelDate === 'number') {
@@ -37,7 +37,6 @@ async function importarExcel(filePath) {
             database: process.env.DB_NAME
         });
       
-
         // Leer el archivo Excel
         const workbook = XLSX.readFile(filePath);
         const sheetName = workbook.SheetNames[0];
@@ -47,7 +46,7 @@ async function importarExcel(filePath) {
         const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1 }).slice(3);
 
         // Columnas deseadas y sus índices
-        const columnasDeseadas = ["F", "I", "AQ", "AU", "AO"];
+        const columnasDeseadas = ["A", "F", "I", "AQ", "AU", "AO"];
         const indices = columnasDeseadas.map(col => XLSX.utils.decode_col(col));
         
         var fecha;
@@ -59,30 +58,40 @@ async function importarExcel(filePath) {
                 return fila[i] || null;
             });
 
+            if (valores[0]){
             // Insertar en la tabla "ordenes"
-            const [ordenResult] = await connection.query(
-                "INSERT INTO orden (fechaCierre, apodoVendedor, subtotalArticulos, recibidoNeto) VALUES (?, ?, ?, ?)",
-                valores
-            );
-
-            const ordenId = ordenResult.insertId; // Obtener ID de la orden insertada
+                const [ordenResult] = await connection.query(
+                    "INSERT INTO orden (idreporte, fechaCierre, apodoVendedor, subtotalArticulos, recibidoNeto) VALUES (?, ?, ?, ?, ?)",
+                    valores
+                );
+            
+                const ordenId = ordenResult.insertId; // Obtener ID de la orden insertada
 
             // Manejar la columna AO (productos separados por coma)
-            const productos = String(valores[4] || "").split(",").map(p => p.trim()); // valores[2] = col_AO
+            const productos = String(valores[5] || "").split(",").map(p => p.trim()); // valores[2] = col_AO
 
-            for (const producto of productos) {
-                if (producto) {
-                    await connection.query(
-                        "INSERT INTO productoxorden (idorden, sku) VALUES (?, ?)",
-                        [ordenId, producto]
-                    );
+                for (const producto of productos) {
+                    if (producto) {
+                        console.log(producto)
+                        await connection.query(
+                            "INSERT INTO productoxorden (idorden, sku) VALUES (?, ?)",
+                            [ordenId, producto]
+                        );
+                    }
+                 /*   else{
+                        console.log(producto)
+                        await connection.query(
+                            "INSERT INTO productoxorden (idorden, sku) VALUES (?, ?)",
+                            [ordenId, 0]
+                        );
+                    }*/
                 }
             }
             fecha = valores[0];
         }
 
-          console.log("Ordenes insertadas correctamente al ",fecha);
-          mensaje = "Ordenes insertadas correctamente al " + String(fecha);
+        console.log("Ordenes insertadas correctamente al ",fecha);
+        mensaje = "Ordenes insertadas correctamente al " + String(fecha);
         await connection.end();
     } catch (error) {
         console.log("Error: "+ error.message);
@@ -90,7 +99,7 @@ async function importarExcel(filePath) {
         process.exit(1);
     }
 
-    exec(`node ./calculodiarioordenes.js ${fecha}`, (error, stdout, stderr) => {
+    exec(`node ${process.env.DIR_PROCCESS}/calculodiarioordenes.js ${fecha}`, (error, stdout, stderr) => {
         if (error) {
             console.error(`❌ Error al ejecutar el script: ${error.message}`);
             return;
@@ -104,7 +113,7 @@ async function importarExcel(filePath) {
         console.log(`📤 Resultado del script:\n${stdout}`);
     });
 
-    exec(`node ./enviarmensaje.js "${mensaje}"`, (error, stdout, stderr) => {
+    exec(`node ${process.env.DIR_PROCCESS}/enviarmensaje.js "${mensaje}"`, (error, stdout, stderr) => {
         if (error) {
           console.error(`Error al ejecutar script Twilio: ${error.message}`);
           return;

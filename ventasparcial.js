@@ -29,6 +29,8 @@ function convertirFecha(fecha) {
 
 async function importarNuevoExcel(filePath) {
     let mensaje;
+    let date = new Date()
+    const horaActual = date.getHours()+":"+date.getMinutes()+":"+ date.getSeconds();
     try {
         // Conectar a MySQL
         const connection = await mysql.createConnection({
@@ -51,7 +53,7 @@ async function importarNuevoExcel(filePath) {
         // Convertir la hoja a JSON y omitir la primera fila si es cabecera
         const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1 }).slice(2);
 
-        // Columnas a extraer: A, C, D, K, P, F (para stock)
+        // Columnas a extraer: Sku, Producto, Sku Variante, Stock, Stock Disponible, Vendidos, Precio Promedio (para stock)
         const columnasDeseadas = ["A", "C", "D", "E", "F", "K", "P"];
         const indices = columnasDeseadas.map(col => XLSX.utils.decode_col(col));
 
@@ -63,62 +65,36 @@ async function importarNuevoExcel(filePath) {
                 valores[2] = " "
             }
 
-            const [sku, nombre, skuVariante, stock, stockDisponible, ,] = valores; // Mapeo de valores
+            const [sku, ,skuVariante, , , ,] = valores; // Mapeo de valores
 
-  
-            // Insertar en "venta"
-            await connection.query(
-                "INSERT INTO venta (sku, nombre, skuVariante, stock, stockDisponible, vendidos, precioPromedio, fecha) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                [...valores, fechaB1]
-            );
-            // Verificar si el SKU ya existe en "producto"
-            let [productoExistente, UltimaModificacion] = await connection.query(
-                "SELECT sku, fechaUltimaModificacion FROM producto WHERE sku like ? AND skuVariante like ?",
-                [sku, skuVariante]
+            let [resul] = await connection.query(
+                "SELECT max(parcial) as resul FROM ventaparcial WHERE fecha like ? and sku like ? and skuVariante like ?",
+                [fechaB1, sku, skuVariante]
             );
 
-            if (UltimaModificacion == null){
-                UltimaModificacion = '1990-01-01'
+            let parcial =  resul[0].resul ?? null;;
+
+            if (parcial == null){
+                parcial = 1
+            } else{
+                parcial += 1;
             }
 
-            if (productoExistente.length > 0 && UltimaModificacion > fechaB1) {
+                await connection.query(
+                    "INSERT INTO ventaparcial (sku, nombre, skuVariante, stock, stockDisponible, vendidos, precioPromedio, fecha, hora, parcial) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    [...valores, fechaB1, horaActual, parcial]
+                );
 
-                // Actualizar stock y fechaUltimaModificacion
-                await connection.query(
-                    "UPDATE producto SET stock = ?, stockDisponible = ?, fechaUltimaModificacion = ?, activo = ? WHERE sku like ? AND skuVariante like ?",
-                    [stock, stockDisponible, fechaB1, 1, sku, skuVariante]
-                );
-            } else {
-                // Insertar nuevo producto
-                await connection.query(
-                    "INSERT INTO producto (sku, nombre, skuVariante, stock, stockDisponible, activo, fechaUltimaModificacion) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                    [sku, nombre, skuVariante, stock, stockDisponible, 1, fechaB1]
-                );
-            }
         }
 
-        console.log("Productos y Ventas insertados correctamente al ",fechaB1);
-        mensaje = "Productos y Ventas insertados correctamente al " + String(fechaB1);
+        console.log("Ventas parciales insertadas correctamente al ",fechaB1);
+        mensaje = "Ventas parciales insertadas correctamente al " + String(fechaB1);
       await connection.end();
   } catch (error) {
       console.log("Error: "+ error.message);
       mensaje = error.message;
       process.exit(1);
   }
-
-  exec(`node ${process.env.DIR_PROCCESS}/calculodiarioventas.js ${fechaB1}`, (error, stdout, stderr) => {
-    if (error) {
-        console.error(`❌ Error al ejecutar el script: ${error.message}`);
-        return;
-    }
-
-    if (stderr) {
-        console.error(`⚠️ STDERR: ${stderr}`);
-        return;
-    }
-
-    console.log(`📤 Resultado del script:\n${stdout}`);
-});
 
   exec(`node ${process.env.DIR_PROCCESS}/enviarmensaje.js "${mensaje}"`, (error, stdout, stderr) => {
       if (error) {

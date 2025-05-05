@@ -69,7 +69,7 @@ async function importarNuevoExcel(filePath) {
         process.exit(1);
     }
 
-    exec(`node ./enviarmensaje.js "${mensaje}"`, (error, stdout, stderr) => {
+    exec(`node ${process.env.DIR_PROCCESS}/enviarmensaje.js "${mensaje}"`, (error, stdout, stderr) => {
         if (error) {
           console.error(`Error al ejecutar script Twilio: ${error.message}`);
           return;

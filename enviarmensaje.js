@@ -1,5 +1,8 @@
 const twilio = require('twilio');
 
+/*Cuenta:  */
+
+
 // Credenciales de Twilio
 const accountSid = 'AC434a0dc49bbc76206f9e2bec9986047b';
 const authToken = 'e43f7fc637cac834dc06e319799c5f39';
